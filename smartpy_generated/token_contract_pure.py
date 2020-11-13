@@ -3,7 +3,9 @@ import smartpy_michelson as mi
 
 class FA12(sp.Contract):
     def __init__(self, admin):
-        self.init(paused = False, balances = sp.big_map(tvalue = sp.TRecord(approvals = sp.TMap(sp.TAddress, sp.TNat), balance = sp.TNat, counter = sp.TNat)), administrator = admin, totalSupply = 0)
+        self.init(paused = False, balances = sp.big_map(tvalue = sp.TRecord(approvals = sp.TMap(sp.TAddress, sp.TNat), balance = sp.TNat)), administrator = admin, totalSupply = 0,
+        permits = sp.big_map(tkey = sp.TPair(sp.TAddress, sp.TBytes), tvalue = sp.TTimestamp), user_expiries = sp.big_map(tkey = sp.TAddress, tvalue = sp.TOption(sp.TNat)),
+        permit_expiries = sp.big_map(tkey = sp.TPair(sp.TAddress, sp.TBytes), tvalue = sp.TOption(sp.TNat)), counter = 0, default_expiry = 360)
 
     @sp.sub_entry_point
     def transfer_helper(self, params):
@@ -25,22 +27,34 @@ class FA12(sp.Contract):
         self.transfer_helper(new_params)
 
     @sp.entry_point
-    def transferSigned(self, params):
+    def transfer_signed(self, params):
         sp.set_type(params, sp.TRecord(from_ = sp.TAddress, to_ = sp.TAddress, value = sp.TNat, pk = sp.TKey, signed = sp.TSignature))
         sender = sp.local("sender", sp.sender)
         with sp.if_((params.from_ != sender.value)):
-            sender_account = self.data.balances[params.from_]
-            counter = sender_account.counter
             params_bytes = sp.concat([sp.pack(params.from_), sp.pack(params.to_), sp.pack(params.value)])
             params_hash = sp.blake2b(params_bytes)
-            unsigned_tx = sp.blake2b(mi.operator("SELF; ADDRESS; CHAIN_ID; PAIR; PAIR; PACK", [sp.TPair(sp.TNat, sp.TBytes)], [sp.TBytes])(sp.pair(counter, params_hash)))
-            pkAddress = sp.to_address(sp.implicit_account(sp.hash_key(params.pk)))
-            with sp.if_(sp.check_signature(params.pk, params.signed, unsigned_tx)):
-                sender.value = pkAddress
-            with sp.else_():
-                sp.failwith(sp.pair("MISSIGNED", unsigned_tx))
-            counter += 1
+            unsigned = sp.blake2b(mi.operator("SELF; ADDRESS; CHAIN_ID; PAIR; PAIR; PACK", [sp.TPair(sp.TNat, sp.TBytes)], [sp.TBytes])(sp.pair(self.data.counter, params_hash)))
+            pk_address = sp.to_address(sp.implicit_account(sp.hash_key(params.pk)))
+            sp.verify(self.data.permits.contains(sp.pair(pk_address, unsigned)),
+                      message = sp.pair("NO_PERMIT", sp.pair(pk_address, unsigned)))
+            #Setting sender.value to pk_address so call to transfer_helper will be authorized
+            sender.value = pk_address
         self.transfer_helper(sp.record(from_ = params.from_, to_ = params.to_, value = params.value, sender_ = sender.value))
+
+    @sp.entry_point
+    def add_permits(self, params):
+        sp.set_type(params, sp.TList(sp.TPair(sp.TKey, sp.TPair(sp.TSignature, sp.TBytes))))
+        #Local variable initialization (values here don't matter)
+        pk_address = sp.local('pk_address', sp.self_address)
+        with sp.for_('permit', params) as permit:
+          pk_address.value = sp.to_address(sp.implicit_account(sp.hash_key(sp.fst(permit))))
+          with sp.if_(self.data.permits.contains(sp.pair(pk_address.value, sp.snd(sp.snd(permit))))):
+            sp.failwith("DUP_PERMIT")
+          with sp.if_(sp.check_signature(sp.fst(permit), sp.fst(sp.snd(permit)), sp.snd(sp.snd(permit)))):
+            self.data.permits[sp.pair(pk_address.value, sp.snd(sp.snd(permit)))] = sp.now
+            self.data.counter = self.data.counter + 1
+          with sp.else_():
+            sp.failwith(sp.pair("MISSIGNED", sp.snd(sp.snd(permit))))
 
     @sp.entry_point
     def approve(self, params):
@@ -80,7 +94,7 @@ class FA12(sp.Contract):
 
     def addAddressIfNecessary(self, address):
         with sp.if_(~ self.data.balances.contains(address)):
-            self.data.balances[address] = sp.record(balance = 0, approvals = {}, counter = 0)
+            self.data.balances[address] = sp.record(balance = 0, approvals = {})
 
     @sp.entry_point
     def getBalance(self, params):
