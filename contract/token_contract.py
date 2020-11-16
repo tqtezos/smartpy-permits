@@ -5,7 +5,7 @@ class FA12(sp.Contract):
     def __init__(self, admin):
         self.init(paused = False, balances = sp.big_map(tvalue = sp.TRecord(approvals = sp.TMap(sp.TAddress, sp.TNat), balance = sp.TNat)), administrator = admin, totalSupply = 0,
         permits = sp.big_map(tkey = sp.TPair(sp.TAddress, sp.TBytes), tvalue = sp.TTimestamp), user_expiries = sp.big_map(tkey = sp.TAddress, tvalue = sp.TOption(sp.TNat)),
-        permit_expiries = sp.big_map(tkey = sp.TPair(sp.TAddress, sp.TBytes), tvalue = sp.TOption(sp.TNat)), counter = 0, default_expiry = 360, metadata = sp.metadata_of_url("tezos-storage:"))
+        permit_expiries = sp.big_map(tkey = sp.TPair(sp.TAddress, sp.TBytes), tvalue = sp.TOption(sp.TNat)), counter = 0, default_expiry = 360, metadata = sp.big_map(l = {"" : sp.bytes_of_string("tezos-storage:md-json"), "md-json" : sp.bytes_of_string("{}")}) )
 
     @sp.entry_point
     def transfer(self, params):
@@ -110,6 +110,14 @@ class FA12(sp.Contract):
     @sp.entry_point
     def getAdministrator(self, params):
         sp.transfer(self.data.administrator, sp.tez(0), sp.contract(sp.TAddress, params.target).open_some())
+
+    @sp.entry_point
+    def getCounter(self, params):
+        sp.transfer(self.data.counter, sp.tez(0), sp.contract(sp.TNat, params.target).open_some())
+
+    @sp.entry_point
+    def getDefaultExpiry(self, params):
+        sp.transfer(self.data.default_expiry, sp.tez(0), sp.contract(sp.TNat, params.target).open_some())
 
 class Viewer(sp.Contract):
     def __init__(self, t):
@@ -222,3 +230,15 @@ if "templates" not in __name__:
         scenario += view_allowance
         scenario += c1.getAllowance(arg = sp.record(owner = alice.address, spender = bob.address), target = view_allowance.address)
         scenario.verify_equal(view_allowance.data.last, sp.some(1))
+
+        scenario.h2("Counter")
+        view_counter = Viewer(sp.TNat)
+        scenario += view_counter
+        scenario += c1.getCounter(target = view_counter.address)
+        scenario.verify_equal(view_counter.data.last, sp.some(1))
+
+        scenario.h2("Default Expiry")
+        view_defaultExpiry = Viewer(sp.TNat)
+        scenario += view_defaultExpiry
+        scenario += c1.getDefaultExpiry(target = view_defaultExpiry.address)
+        scenario.verify_equal(view_defaultExpiry.data.last, sp.some(360))
