@@ -5,7 +5,7 @@ class FA12(sp.Contract):
     def __init__(self, admin):
         self.init(paused = False, balances = sp.big_map(tvalue = sp.TRecord(approvals = sp.TMap(sp.TAddress, sp.TNat), balance = sp.TNat)), administrator = admin, totalSupply = 0,
         permits = sp.big_map(tkey = sp.TPair(sp.TAddress, sp.TBytes), tvalue = sp.TTimestamp), user_expiries = sp.big_map(tkey = sp.TAddress, tvalue = sp.TOption(sp.TNat)),
-        permit_expiries = sp.big_map(tkey = sp.TPair(sp.TAddress, sp.TBytes), tvalue = sp.TOption(sp.TNat)), counter = 0, default_expiry = 360)
+        permit_expiries = sp.big_map(tkey = sp.TPair(sp.TAddress, sp.TBytes), tvalue = sp.TOption(sp.TNat)), counter = 0, default_expiry = 360, metadata = sp.metadata_of_url("tezos-storage:"))
 
     @sp.sub_entry_point
     def transfer_helper(self, params):
@@ -28,16 +28,15 @@ class FA12(sp.Contract):
 
     @sp.entry_point
     def transfer_signed(self, params):
-        sp.set_type(params, sp.TRecord(from_ = sp.TAddress, to_ = sp.TAddress, value = sp.TNat, counter = sp.TNat)).layout(("from_ as from", ("to_ as to", ("value", "counter"))))
+        sp.set_type(params, sp.TRecord(from_ = sp.TAddress, to_ = sp.TAddress, value = sp.TNat)).layout(("from_ as from", ("to_ as to", "value")))
         sender = sp.local("sender", sp.sender)
         with sp.if_((params.from_ != sender.value)):
-            params_hash = sp.blake2b(sp.pack(sp.pair(params.from_, sp.pair(params.to_, params.value))))
-            unsigned = sp.pack(sp.pair(sp.pair(sp.chain_id, sp.self_address), sp.pair(params.counter, params_hash)))
+            params_hash = sp.blake2b(sp.pack(params))
             #unsigned = sp.blake2b(mi.operator("SELF; ADDRESS; CHAIN_ID; PAIR; PAIR; PACK", [sp.TPair(sp.TNat, sp.TBytes)], [sp.TBytes])(sp.pair(self.data.counter, params_hash)))
-            sp.verify(self.data.permits.contains(sp.pair(params.from_, unsigned)),
-                      message = sp.pair("NO_PERMIT", sp.pair(params.from_, unsigned)))
+            sp.verify(self.data.permits.contains(sp.pair(params.from_, params_hash)),
+                      message = sp.pair("NO_PERMIT", sp.pair(params.from_, params_hash)))
             #Deleting permit
-            del self.data.permits[sp.pair(params.from_, unsigned)]
+            del self.data.permits[sp.pair(params.from_, params_hash)]
             #Setting sender.value to from_ so call to transfer_helper will be authorized
             sender.value = params.from_
         self.transfer_helper(sp.record(from_ = params.from_, to_ = params.to_, value = params.value, sender_ = sender.value))
@@ -47,14 +46,16 @@ class FA12(sp.Contract):
         sp.set_type(params, sp.TList(sp.TPair(sp.TKey, sp.TPair(sp.TSignature, sp.TBytes))))
         sp.verify(~self.data.paused)
         #Local variable initialization (values here don't matter)
+        params_hash = sp.local('params_hash', sp.bytes('0x0000'))
         unsigned = sp.local('unsigned', sp.bytes('0x0000'))
         pk_address = sp.local('pk_address', sp.self_address)
         with sp.for_('permit', params) as permit:
-          unsigned.value = sp.snd(sp.snd(permit))
+          params_hash.value = sp.snd(sp.snd(permit))
+          unsigned.value = sp.pack(sp.pair(sp.pair(sp.chain_id, sp.self_address), sp.pair(self.data.counter, params_hash.value)))
           pk_address.value = sp.to_address(sp.implicit_account(sp.hash_key(sp.fst(permit))))
-          sp.verify(~ self.data.permits.contains(sp.pair(pk_address.value, unsigned.value)), "DUP_PERMIT")
+          sp.verify(~ self.data.permits.contains(sp.pair(pk_address.value, params_hash.value)), sp.pair("DUP_PERMIT", params_hash.value))
           sp.verify(sp.check_signature(sp.fst(permit), sp.fst(sp.snd(permit)), unsigned.value), sp.pair("MISSIGNED", unsigned.value))
-          self.data.permits[sp.pair(pk_address.value, unsigned.value)] = sp.now
+          self.data.permits[sp.pair(pk_address.value, params_hash.value)] = sp.now
           self.data.counter = self.data.counter + 1
 
     @sp.entry_point
@@ -139,7 +140,6 @@ if "templates" not in __name__:
         # Let's display the accounts:
         scenario.h1("Accounts")
         scenario.show([admin, alice, bob, carlos])
-        scenario.show(carlos.public_key)
 
         scenario.h1("Contract")
         c1 = FA12(admin.address)
@@ -190,14 +190,14 @@ if "templates" not in __name__:
         #TODO: Replace c1.data.counter here with get_counter method
         unsigned = sp.pack(sp.pair(sp.pair(sp.chain_id_cst("0x9caecab9"), c1.address), sp.pair(c1.data.counter, params_hash)))
         signature = sp.make_signature(secret_key = carlos.secret_key, message = unsigned, message_format = "Raw")
-        scenario += c1.add_permits([sp.pair(carlos.public_key, sp.pair(signature, unsigned))]).run(sender = alice, now = sp.timestamp(1571761674))
+        scenario += c1.add_permits([sp.pair(carlos.public_key, sp.pair(signature, params_hash))]).run(sender = alice, now = sp.timestamp(1571761674), chain_id = sp.chain_id_cst("0x9caecab9"))
         scenario.verify(c1.data.counter == 1)
         #I'm not sure if there is a better way to do this here. I would like to do something like unsigned_value = sp.compute(unsigned) before adding permit (counter incremented so value of unsigned changes when evaluated)
-        unsigned = sp.pack(sp.pair(sp.pair(sp.chain_id_cst("0x9caecab9"), c1.address), sp.pair(c1.data.counter - 1, params_hash)))
-        scenario.verify_equal(c1.data.permits[(sp.pair(carlos.address, unsigned))], sp.timestamp(1571761674))
+        #unsigned = sp.pack(sp.pair(sp.pair(sp.chain_id_cst("0x9caecab9"), c1.address), sp.pair(c1.data.counter - 1, params_hash)))
+        scenario.verify_equal(c1.data.permits[(sp.pair(carlos.address, params_hash))], sp.timestamp(1571761674))
 
         scenario.h2("Execute transfer using permit")
-        scenario += c1.transfer_signed(from_ = carlos.address, to_ = bob.address, value = 10, counter = sp.as_nat(c1.data.counter - 1)).run(sender = bob, chain_id = sp.chain_id_cst("0x9caecab9"), )
+        scenario += c1.transfer_signed(from_ = carlos.address, to_ = bob.address, value = 10).run(sender = bob)
         scenario.verify(c1.data.balances[carlos.address].balance == 0)
         scenario.verify(c1.data.balances[bob.address].balance == 19)
         #Permit deleted
