@@ -7,39 +7,36 @@ class FA12(sp.Contract):
         permits = sp.big_map(tkey = sp.TPair(sp.TAddress, sp.TBytes), tvalue = sp.TTimestamp), user_expiries = sp.big_map(tkey = sp.TAddress, tvalue = sp.TOption(sp.TNat)),
         permit_expiries = sp.big_map(tkey = sp.TPair(sp.TAddress, sp.TBytes), tvalue = sp.TOption(sp.TNat)), counter = 0, default_expiry = 360, metadata = sp.metadata_of_url("tezos-storage:"))
 
-    @sp.sub_entry_point
-    def transfer_helper(self, params):
-        sp.verify((params.sender_ == self.data.administrator) |
+    @sp.entry_point
+    def transfer(self, params):
+        sp.set_type(params, sp.TRecord(from_ = sp.TAddress, to_ = sp.TAddress, value = sp.TNat)).layout(("from_ as from", ("to_ as to", "value")))
+        sender = sp.local("sender", sp.sender)
+        sp.if (self.transfer_presigned(params)):
+            sender.value = params.from_
+        sp.verify((sender.value == self.data.administrator) |
             (~self.data.paused &
-                ((params.from_ == params.sender_) |
-                 (self.data.balances[params.from_].approvals[params.sender_] >= params.value))))
+                ((params.from_ == sender.value) |
+                 (self.data.balances[params.from_].approvals[sender.value] >= params.value))))
         self.addAddressIfNecessary(params.to_)
         sp.verify(self.data.balances[params.from_].balance >= params.value)
         self.data.balances[params.from_].balance = sp.as_nat(self.data.balances[params.from_].balance - params.value)
         self.data.balances[params.to_].balance += params.value
-        sp.if ((params.from_ != params.sender_) & (self.data.administrator != params.sender_)):
-            self.data.balances[params.from_].approvals[params.sender_] = sp.as_nat(self.data.balances[params.from_].approvals[params.sender_] - params.value)
+        sp.if ((params.from_ != sender.value) & (self.data.administrator != sender.value)):
+            self.data.balances[params.from_].approvals[sender.value] = sp.as_nat(self.data.balances[params.from_].approvals[sender.value] - params.value)
 
-    @sp.entry_point
-    def transfer(self, params):
-        sp.set_type(params, sp.TRecord(from_ = sp.TAddress, to_ = sp.TAddress, value = sp.TNat)).layout(("from_ as from", ("to_ as to", "value")))
-        new_params = sp.record(from_ = params.from_, to_ = params.to_, value = params.value, sender_ = sp.sender)
-        self.transfer_helper(new_params)
 
-    @sp.entry_point
-    def transfer_signed(self, params):
+    @sp.sub_entry_point
+    def transfer_presigned(self, params):
         sp.set_type(params, sp.TRecord(from_ = sp.TAddress, to_ = sp.TAddress, value = sp.TNat)).layout(("from_ as from", ("to_ as to", "value")))
-        sender = sp.local("sender", sp.sender)
-        sp.if (params.from_ != sender.value):
-            params_hash = sp.blake2b(sp.pack(params))
-            #unsigned = sp.blake2b(mi.operator("SELF; ADDRESS; CHAIN_ID; PAIR; PAIR; PACK", [sp.TPair(sp.TNat, sp.TBytes)], [sp.TBytes])(sp.pair(self.data.counter, params_hash)))
-            sp.verify(self.data.permits.contains(sp.pair(params.from_, params_hash)),
-                      message = sp.pair("NO_PERMIT", sp.pair(params.from_, params_hash)))
+        params_hash = sp.blake2b(sp.pack(params))
+        #unsigned = sp.blake2b(mi.operator("SELF; ADDRESS; CHAIN_ID; PAIR; PAIR; PACK", [sp.TPair(sp.TNat, sp.TBytes)], [sp.TBytes])(sp.pair(self.data.counter, params_hash)))
+        sp.if self.data.permits.contains(sp.pair(params.from_, params_hash)):
             #Deleting permit
             del self.data.permits[sp.pair(params.from_, params_hash)]
             #Setting sender.value to from_ so call to transfer_helper will be authorized
-            sender.value = params.from_
-        self.transfer_helper(sp.record(from_ = params.from_, to_ = params.to_, value = params.value, sender_ = sender.value))
+            sp.result(sp.bool(True))
+        sp.else:
+            sp.result(sp.bool(False))
 
     @sp.entry_point
     def add_permits(self, params):
@@ -195,7 +192,7 @@ if "templates" not in __name__:
         scenario.verify_equal(c1.data.permits[(sp.pair(carlos.address, params_hash))], sp.timestamp(1571761674))
 
         scenario.h2("Execute transfer using permit")
-        scenario += c1.transfer_signed(from_ = carlos.address, to_ = bob.address, value = 10).run(sender = bob)
+        scenario += c1.transfer(from_ = carlos.address, to_ = bob.address, value = 10).run(sender = bob)
         scenario.verify(c1.data.balances[carlos.address].balance == 0)
         scenario.verify(c1.data.balances[bob.address].balance == 19)
         #Permit deleted
