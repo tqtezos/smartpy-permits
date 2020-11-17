@@ -27,7 +27,7 @@ class FA12(sp.Contract):
 
     @sp.sub_entry_point
     def transfer_presigned(self, params):
-        sp.set_type(params, sp.TRecord(from_ = sp.TAddress, to_ = sp.TAddress, value = sp.TNat)).layout(("from_ as from", ("to_ as to", "value")))
+        sp.set_type(params, sp.TRecord(from_ = sp.TAddress, to_ = sp.TAddress, value = sp.TNat))
         params_hash = sp.blake2b(sp.pack(params))
         #unsigned = sp.blake2b(mi.operator("SELF; ADDRESS; CHAIN_ID; PAIR; PAIR; PACK", [sp.TPair(sp.TNat, sp.TBytes)], [sp.TBytes])(sp.pair(self.data.counter, params_hash)))
         with sp.if_(self.data.permits.contains(sp.pair(params.from_, params_hash))):
@@ -39,7 +39,7 @@ class FA12(sp.Contract):
             sp.result(sp.bool(False))
 
     @sp.entry_point
-    def add_permits(self, params):
+    def permit(self, params):
         sp.set_type(params, sp.TList(sp.TPair(sp.TKey, sp.TPair(sp.TSignature, sp.TBytes))))
         sp.verify(~self.data.paused)
         #Local variable initialization (values here don't matter)
@@ -54,6 +54,52 @@ class FA12(sp.Contract):
           sp.verify(sp.check_signature(sp.fst(permit), sp.fst(sp.snd(permit)), unsigned.value), sp.pair("MISSIGNED", unsigned.value))
           self.data.permits[sp.pair(pk_address.value, params_hash.value)] = sp.now
           self.data.counter = self.data.counter + 1
+
+    """
+    #Returns (0,sp.timestamp(0)) if permit DNE. Otherwise (expiry, submission_timestamp)
+    @sp.global_lambda
+    def getEffectiveExpiry(self, params):
+        sp.set_type(params, sp.TRecord(address = sp.TAddress, permit = sp.TOption(sp.TBytes))).layout("address", "permit"))
+        with sp.if_(permit.is_some()):
+            some_permit = permit.open_some()
+            with sp.if_(self.data.permits.contains(sp.pair(params.address, some_permit))):
+                permit_submission_timestamp = self.data.permits[sp.pair(params.address, some_permit)]
+                sp.if self.data.permit_expiries.contains(sp.pair(params.address, some_permit)) &
+                      self.data.permit_expiries[sp.pair(params.address, some_permit)].is_some():
+                      permit_expiry = self.data.permit_expiries[sp.pair(params.address, some_permit)].open_some()
+                      sp.result(permit_expiry, permit_submission_timestamp)
+                sp.if self.data.user_expiries.contains(params.address) &
+                      self.data.user_expiries[params.address].is_some():
+                      user_expiry = self.data.user_expiries[params.address].open_some()
+                      sp.result(user_expiry, permit_submission_timestamp)
+                sp.result(self.data.default_expiry, permit_submission_timestamp)
+            with sp.else_():
+                sp.result(sp.pair(0,sp.timestamp(0)))
+    """
+
+    @sp.entry_point
+    def setExpiry(self, params):
+        sp.set_type(params, sp.TRecord(address = sp.TAddress, seconds = sp.TNat, permit = sp.TOption(sp.TBytes))).layout(("address", ("seconds", "permit")))
+        sp.verify_equal(params.address, sp.sender, message = "NOT_AUTHORIZED")
+        with sp.if_(params.permit.is_some()):
+          some_permit = params.permit.open_some()
+          sp.verify(self.data.permits.contains(sp.pair(params.address, some_permit)), "PERMIT_NONEXISTENT")
+          permit_submission_timestamp = self.data.permits[sp.pair(params.address, some_permit)]
+          with sp.if_(self.data.permit_expiries.contains(sp.pair(params.address, some_permit)) & self.data.permit_expiries[sp.pair(params.address, some_permit)].is_some()):
+                  permit_expiry = self.data.permit_expiries[sp.pair(params.address, some_permit)].open_some()
+                  sp.verify(sp.as_nat(sp.now - permit_submission_timestamp) > permit_expiry, "PERMIT_REVOKED")
+                  self.data.permit_expiries[sp.pair(params.address, some_permit)] = sp.some(params.seconds)
+          with sp.else_():
+                with sp.if_(self.data.user_expiries.contains(params.address) & self.data.user_expiries[params.address].is_some()):
+                      user_expiry = self.data.user_expiries[params.address].open_some()
+                      sp.verify(sp.as_nat(sp.now - permit_submission_timestamp) > user_expiry, "PERMIT_REVOKED")
+                      self.data.permit_expiries[sp.pair(params.address, some_permit)] = sp.some(params.seconds)
+                with sp.else_():
+                      sp.verify(sp.as_nat(sp.now - permit_submission_timestamp) > self.data.default_expiry, "PERMIT_REVOKED")
+                      self.data.permit_expiries[sp.pair(params.address, some_permit)] = sp.some(params.seconds)
+        #Caution/Question about tzip-17: there might be a situation in which permit once was revoked now is alive, if we change user-expiry and that was considered the effective_expiry previously, or if default_expiry was effective and it was less than new value for user expiry.
+        with sp.else_():
+            self.data.user_expiries[params.address] = sp.some(params.seconds)
 
     @sp.entry_point
     def approve(self, params):
@@ -195,7 +241,7 @@ if "templates" not in __name__:
         #TODO: Replace c1.data.counter here with get_counter method
         unsigned = sp.pack(sp.pair(sp.pair(sp.chain_id_cst("0x9caecab9"), c1.address), sp.pair(c1.data.counter, params_hash)))
         signature = sp.make_signature(secret_key = carlos.secret_key, message = unsigned, message_format = "Raw")
-        scenario += c1.add_permits([sp.pair(carlos.public_key, sp.pair(signature, params_hash))]).run(sender = alice, now = sp.timestamp(1571761674), chain_id = sp.chain_id_cst("0x9caecab9"))
+        scenario += c1.permit([sp.pair(carlos.public_key, sp.pair(signature, params_hash))]).run(sender = alice, now = sp.timestamp(1571761674), chain_id = sp.chain_id_cst("0x9caecab9"))
         scenario.verify(c1.data.counter == 1)
         scenario.verify_equal(c1.data.permits[(sp.pair(carlos.address, params_hash))], sp.timestamp(1571761674))
 
