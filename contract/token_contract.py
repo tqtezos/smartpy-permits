@@ -26,6 +26,26 @@ class FA12(sp.Contract):
         sp.if ((params.from_ != sender.value) & (self.data.administrator != sender.value)):
             self.data.balances[params.from_].approvals[sender.value] = sp.as_nat(self.data.balances[params.from_].approvals[sender.value] - params.value)
 
+    @sp.entry_point
+    def delete_permits(self, permit_keys):
+        sp.set_type(permit_keys, sp.TList(sp.TPair(sp.TAddress, sp.TBytes)))
+        effective_expiry = sp.local("effective_expiry", 0)
+        sp.for permit_key in permit_keys:
+            permit_exists = self.data.permits.contains(permit_key)
+            sp.verify(permit_exists, sp.pair("NO_PERMIT_TO_DELETE", permit_key))
+            effective_expiry = self.getEffectiveExpiry(permit_key)
+            permit_submission_timestamp = self.data.permits[permit_key]
+            sp.verify(sp.as_nat(sp.now - permit_submission_timestamp) >= effective_expiry,
+            sp.pair("PERMIT_NOT_EXPIRED", permit_key))
+            self.delete_permit(permit_key)
+
+    def delete_permit(self, permit_key):
+        sp.set_type(permit_key, sp.TPair(sp.TAddress, sp.TBytes))
+        sp.if self.data.permits.contains(permit_key):
+            del self.data.permits[permit_key]
+        sp.if self.data.permit_expiries.contains(permit_key):
+            del self.data.permit_expiries[permit_key]
+
     @sp.sub_entry_point
     def transfer_presigned(self, params):
         sp.set_type(params, sp.TRecord(from_ = sp.TAddress, to_ = sp.TAddress, value = sp.TNat))
@@ -46,10 +66,10 @@ class FA12(sp.Contract):
             #Deleting permit regardless of whether or not its expired
             sp.if sp.as_nat(sp.now - permit_submission_timestamp) >= effective_expiry.value:
                 #Expired
-                del self.data.permits[sp.pair(params.from_, params_hash)]
+                self.delete_permit(permit_key)
                 sp.result(sp.bool(False))
             sp.else:
-                del self.data.permits[sp.pair(params.from_, params_hash)]
+                self.delete_permit(permit_key)
                 sp.result(sp.bool(True))
         sp.else:
             sp.result(sp.bool(False))
@@ -283,6 +303,10 @@ if "templates" not in __name__:
         scenario.verify(c1.data.permit_expiries[sp.pair(carlos.address, params_hash_1)].open_some() == 0)
         scenario += c1.transfer(from_ = carlos.address, to_ = bob.address, value = 10).run(sender = bob, now = sp.timestamp(1571761680), valid = False) #Uses later time stamp
 
+        scenario.h2("Delete Expired Permit")
+        scenario += c1.delete_permits([sp.pair(carlos.address, params_hash_1)]).run(now = sp.timestamp(1571761680))
+        scenario.verify(~ c1.data.permit_expiries.contains(sp.pair(carlos.address, params_hash_1)))
+        scenario.verify(~ c1.data.permits.contains(sp.pair(carlos.address, params_hash_1)))
 
         scenario.h1("Views")
         scenario.h2("Balance")
