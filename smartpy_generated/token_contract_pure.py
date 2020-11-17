@@ -5,13 +5,15 @@ class FA12(sp.Contract):
     def __init__(self, admin):
         self.init(paused = False, balances = sp.big_map(tvalue = sp.TRecord(approvals = sp.TMap(sp.TAddress, sp.TNat), balance = sp.TNat)), administrator = admin, totalSupply = 0,
         permits = sp.big_map(tkey = sp.TPair(sp.TAddress, sp.TBytes), tvalue = sp.TTimestamp), user_expiries = sp.big_map(tkey = sp.TAddress, tvalue = sp.TOption(sp.TNat)),
-        permit_expiries = sp.big_map(tkey = sp.TPair(sp.TAddress, sp.TBytes), tvalue = sp.TOption(sp.TNat)), counter = 0, default_expiry = 360, metadata = sp.big_map(l = {"" : sp.bytes_of_string("tezos-storage:md-json"), "md-json" : sp.bytes_of_string("{}")}) )
+        permit_expiries = sp.big_map(tkey = sp.TPair(sp.TAddress, sp.TBytes), tvalue = sp.TOption(sp.TNat)), counter = 0,
+        default_expiry = 360, metadata = sp.big_map(l = {"" : sp.bytes_of_string("tezos-storage:md-json"), "md-json" : sp.bytes_of_string("{}")}) )
 
     @sp.entry_point
     def transfer(self, params):
         sp.set_type(params, sp.TRecord(from_ = sp.TAddress, to_ = sp.TAddress, value = sp.TNat)).layout(("from_ as from", ("to_ as to", "value")))
         sender = sp.local("sender", sp.sender)
         with sp.if_((self.transfer_presigned(params))):
+            #Setting sender.value to from_ so call to transfer_helper will be authorized
             sender.value = params.from_
         sp.verify((sender.value == self.data.administrator) |
             (~self.data.paused &
@@ -24,17 +26,47 @@ class FA12(sp.Contract):
         with sp.if_(((params.from_ != sender.value) & (self.data.administrator != sender.value))):
             self.data.balances[params.from_].approvals[sender.value] = sp.as_nat(self.data.balances[params.from_].approvals[sender.value] - params.value)
 
+    """
+    @sp.sub_entry_point
+    def getEffectiveExpiry(self, params):
+        sp.set_type(params, sp.TPair(sp.TAddress, sp.TBytes))
+        address = sp.fst(params)
+        with sp.if_(self.data.permit_expiries.contains(params) & self.data.permit_expiries[params].is_some()):
+              permit_expiry = self.data.permit_expiries[params].open_some()
+              sp.result(permit_expiry)
+        with sp.else_():
+            with sp.if_(self.data.user_expiries.contains(address) & self.data.user_expiries[address].is_some()):
+                  user_expiry = self.data.user_expiries[address].open_some()
+                  sp.result(user_expiry)
+            with sp.else_():
+                sp.result(self.data.default_expiry)
+    """
 
     @sp.sub_entry_point
     def transfer_presigned(self, params):
         sp.set_type(params, sp.TRecord(from_ = sp.TAddress, to_ = sp.TAddress, value = sp.TNat))
         params_hash = sp.blake2b(sp.pack(params))
         #unsigned = sp.blake2b(mi.operator("SELF; ADDRESS; CHAIN_ID; PAIR; PAIR; PACK", [sp.TPair(sp.TNat, sp.TBytes)], [sp.TBytes])(sp.pair(self.data.counter, params_hash)))
-        with sp.if_(self.data.permits.contains(sp.pair(params.from_, params_hash))):
-            #Deleting permit
-            del self.data.permits[sp.pair(params.from_, params_hash)]
-            #Setting sender.value to from_ so call to transfer_helper will be authorized
-            sp.result(sp.bool(True))
+        permit_key = sp.pair(params.from_, params_hash)
+        with sp.if_(self.data.permits.contains(permit_key)):
+            permit_submission_timestamp = self.data.permits[permit_key]
+            effective_expiry = sp.local("effective_expiry", 0)
+            with sp.if_(self.data.permit_expiries.contains(permit_key) & self.data.permit_expiries[permit_key].is_some()):
+                  effective_expiry.value = self.data.permit_expiries[permit_key].open_some()
+            with sp.else_():
+                with sp.if_(self.data.user_expiries.contains(params.from_) & self.data.user_expiries[params.from_].is_some()):
+                      effective_expiry.value = self.data.user_expiries[params.from_].open_some()
+                with sp.else_():
+                    effective_expiry.value = self.data.default_expiry
+            #effective_expiry = self.getEffectiveExpiry(sp.pair(params.from_, params_hash))
+            #Deleting permit regardless of whether or not its expired
+            with sp.if_(sp.as_nat(sp.now - permit_submission_timestamp) >= effective_expiry.value):
+                #Expired
+                del self.data.permits[sp.pair(params.from_, params_hash)]
+                sp.result(sp.bool(False))
+            with sp.else_():
+                del self.data.permits[sp.pair(params.from_, params_hash)]
+                sp.result(sp.bool(True))
         with sp.else_():
             sp.result(sp.bool(False))
 
@@ -54,28 +86,6 @@ class FA12(sp.Contract):
           sp.verify(sp.check_signature(sp.fst(permit), sp.fst(sp.snd(permit)), unsigned.value), sp.pair("MISSIGNED", unsigned.value))
           self.data.permits[sp.pair(pk_address.value, params_hash.value)] = sp.now
           self.data.counter = self.data.counter + 1
-
-    """
-    #Returns (0,sp.timestamp(0)) if permit DNE. Otherwise (expiry, submission_timestamp)
-    @sp.global_lambda
-    def getEffectiveExpiry(self, params):
-        sp.set_type(params, sp.TRecord(address = sp.TAddress, permit = sp.TOption(sp.TBytes))).layout("address", "permit"))
-        with sp.if_(permit.is_some()):
-            some_permit = permit.open_some()
-            with sp.if_(self.data.permits.contains(sp.pair(params.address, some_permit))):
-                permit_submission_timestamp = self.data.permits[sp.pair(params.address, some_permit)]
-                sp.if self.data.permit_expiries.contains(sp.pair(params.address, some_permit)) &
-                      self.data.permit_expiries[sp.pair(params.address, some_permit)].is_some():
-                      permit_expiry = self.data.permit_expiries[sp.pair(params.address, some_permit)].open_some()
-                      sp.result(permit_expiry, permit_submission_timestamp)
-                sp.if self.data.user_expiries.contains(params.address) &
-                      self.data.user_expiries[params.address].is_some():
-                      user_expiry = self.data.user_expiries[params.address].open_some()
-                      sp.result(user_expiry, permit_submission_timestamp)
-                sp.result(self.data.default_expiry, permit_submission_timestamp)
-            with sp.else_():
-                sp.result(sp.pair(0,sp.timestamp(0)))
-    """
 
     @sp.entry_point
     def setExpiry(self, params):
@@ -246,7 +256,7 @@ if "templates" not in __name__:
         scenario.verify_equal(c1.data.permits[(sp.pair(carlos.address, params_hash))], sp.timestamp(1571761674))
 
         scenario.h2("Execute transfer using permit")
-        scenario += c1.transfer(from_ = carlos.address, to_ = bob.address, value = 10).run(sender = bob)
+        scenario += c1.transfer(from_ = carlos.address, to_ = bob.address, value = 10).run(sender = bob, now = sp.timestamp(1571761674))
         scenario.verify(c1.data.balances[carlos.address].balance == 0)
         scenario.verify(c1.data.balances[bob.address].balance == 19)
         #Permit deleted
