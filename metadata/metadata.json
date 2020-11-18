@@ -1,0 +1,254 @@
+{
+  "name": "smartpy-permits",
+  "description": "Implementation of Tzip-17 in Smartpy on basic FA1.2 contract\n",
+  "license": {
+    "name": "MIT",
+    "details": "The MIT License"
+  },
+  "homepage": "https://github.com/EGuenz/smartpy-permits",
+  "interfaces": [
+    "TZIP-16",
+    "TZIP-17"
+  ],
+  "views": [
+    {
+      "name": "getDefaultExpiry",
+      "implementations": [
+        {
+          "michelson-storage-view": {
+            "parameter": {
+              "prim": "address", "annots": [ "%getDefaultExpiry" ]
+            },
+            "return-type": {
+              "prim": "nat"
+            },
+            "code": [
+              { "prim": "DIG", "args": [ { "int": "2" } ] },
+              { "prim": "DROP" },
+              { "prim": "DIG", "args": [ { "int": "2" } ] },
+              { "prim": "DROP" },
+              { "prim": "CONTRACT", "args": [ { "prim": "nat" } ] },
+              { "prim": "NIL", "args": [ { "prim": "operation" } ] },
+              { "prim": "SWAP" },
+              { "prim": "IF_NONE", "args": [ [ { "prim": "PUSH", "args": [ { "prim": "int" }, { "int": "229" } ] }, { "prim": "FAILWITH" } ], [] ] },
+              { "prim": "PUSH", "args": [ { "prim": "mutez" }, { "int": "0" } ] },
+              { "prim": "DIG", "args": [ { "int": "3" } ] },
+              { "prim": "DUP" },
+              { "prim": "DUG", "args": [ { "int": "4" } ] },
+              { "prim": "CAR" },
+              { "prim": "CDR" },
+              { "prim": "CDR" },
+              { "prim": "CAR" },
+              { "prim": "TRANSFER_TOKENS" },
+              { "prim": "CONS" }
+            ]
+          }
+        }
+      ],
+      "pure": true
+    },
+    {
+      "name": "getCounter",
+      "implementations": [
+        {
+          "michelson-storage-view": {
+            "parameter": {
+              "prim": "address", "annots": [ "%getCounter" ]
+            },
+            "return-type": {
+              "prim": "nat"
+            },
+            "code": [
+              { "prim": "DIG", "args": [ { "int": "2" } ] },
+              { "prim": "DROP" },
+              { "prim": "DIG", "args": [ { "int": "2" } ] },
+              { "prim": "DROP" },
+              { "prim": "CONTRACT", "args": [ { "prim": "nat" } ] },
+              { "prim": "NIL", "args": [ { "prim": "operation" } ] },
+              { "prim": "SWAP" },
+              { "prim": "IF_NONE", "args": [ [ { "prim": "PUSH", "args": [ { "prim": "int" }, { "int": "223" } ] }, { "prim": "FAILWITH" } ], [] ] },
+              { "prim": "PUSH", "args": [ { "prim": "mutez" }, { "int": "0" } ] },
+              { "prim": "DIG", "args": [ { "int": "3" } ] },
+              { "prim": "DUP" },
+              { "prim": "DUG", "args": [ { "int": "4" } ] },
+              { "prim": "CAR" },
+              { "prim": "CDR" },
+              { "prim": "CAR" },
+              { "prim": "TRANSFER_TOKENS" },
+              { "prim": "CONS" }
+            ]
+          }
+        }
+      ],
+      "pure": true
+    },
+    {
+      "name": "getBalance",
+      "implementations": [
+        {
+          "michelson-storage-view": {
+            "parameter": {
+              "prim": "pair", "args": [ { "prim": "address", "annots": [ "%arg" ] }, { "prim": "address", "annots": [ "%target" ] } ], "annots": [ "%getBalance" ]
+            },
+            "return-type": {
+              "prim": "nat"
+            },
+            "code": [
+              { "prim": "DIG", "args": [ { "int": "2" } ] },
+              { "prim": "DROP" },
+              { "prim": "DIG", "args": [ { "int": "2" } ] },
+              { "prim": "DROP" },
+              { "prim": "DUP" },
+              { "prim": "CDR" },
+              { "prim": "CONTRACT", "args": [ { "prim": "nat" } ] },
+              { "prim": "NIL", "args": [ { "prim": "operation" } ] },
+              { "prim": "SWAP" },
+              { "prim": "IF_NONE", "args": [ [ { "prim": "PUSH", "args": [ { "prim": "int" }, { "int": "204" } ] }, { "prim": "FAILWITH" } ], [] ] },
+              { "prim": "PUSH", "args": [ { "prim": "mutez" }, { "int": "0" } ] },
+              { "prim": "DIG", "args": [ { "int": "4" } ] },
+              { "prim": "DUP" },
+              { "prim": "DUG", "args": [ { "int": "5" } ] },
+              { "prim": "CAR" },
+              { "prim": "CAR" },
+              { "prim": "CDR" },
+              { "prim": "DIG", "args": [ { "int": "4" } ] },
+              { "prim": "CAR" },
+              { "prim": "GET" },
+              { "prim": "IF_NONE", "args": [ [ { "prim": "PUSH", "args": [ { "prim": "int" }, { "int": "203" } ] }, { "prim": "FAILWITH" } ], [] ] },
+              { "prim": "CDR" },
+              { "prim": "TRANSFER_TOKENS" },
+              { "prim": "CONS" }
+            ]
+          }
+        }
+      ],
+      "pure": true
+    },
+    {
+      "name": "getTotalSupply",
+      "implementations": [
+        {
+          "michelson-storage-view": {
+            "parameter": {
+              "prim": "address", "annots": [ "%getTotalSupply" ]
+            },
+            "return-type": {
+              "prim": "nat"
+            },
+            "code": [
+              { "prim": "DIG", "args": [ { "int": "2" } ] },
+              { "prim": "DROP" },
+              { "prim": "DIG", "args": [ { "int": "2" } ] },
+              { "prim": "DROP" },
+              { "prim": "CONTRACT", "args": [ { "prim": "nat" } ] },
+              { "prim": "NIL", "args": [ { "prim": "operation" } ] },
+              { "prim": "SWAP" },
+              { "prim": "IF_NONE", "args": [ [ { "prim": "PUSH", "args": [ { "prim": "int" }, { "int": "214" } ] }, { "prim": "FAILWITH" } ], [] ] },
+              { "prim": "PUSH", "args": [ { "prim": "mutez" }, { "int": "0" } ] },
+              { "prim": "DIG", "args": [ { "int": "3" } ] },
+              { "prim": "DUP" },
+              { "prim": "DUG", "args": [ { "int": "4" } ] },
+              { "prim": "CDR" },
+              { "prim": "CDR" },
+              { "prim": "CDR" },
+              { "prim": "CAR" },
+              { "prim": "TRANSFER_TOKENS" },
+              { "prim": "CONS" }
+            ]
+          }
+        }
+      ],
+      "pure": true
+    },
+    {
+      "name": "getAdministrator",
+      "implementations": [
+        {
+          "michelson-storage-view": {
+            "parameter": {
+              "prim": "address", "annots": [ "%getAdministrator" ]
+            },
+            "return-type": {
+              "prim": "address"
+            },
+            "code": [
+              { "prim": "DIG", "args": [ { "int": "2" } ] },
+              { "prim": "DROP" },
+              { "prim": "DIG", "args": [ { "int": "2" } ] },
+              { "prim": "DROP" },
+              { "prim": "CONTRACT", "args": [ { "prim": "address" } ] },
+              { "prim": "NIL", "args": [ { "prim": "operation" } ] },
+              { "prim": "SWAP" },
+              { "prim": "IF_NONE", "args": [ [ { "prim": "PUSH", "args": [ { "prim": "int" }, { "int": "219" } ] }, { "prim": "FAILWITH" } ], [] ] },
+              { "prim": "PUSH", "args": [ { "prim": "mutez" }, { "int": "0" } ] },
+              { "prim": "DIG", "args": [ { "int": "3" } ] },
+              { "prim": "DUP" },
+              { "prim": "DUG", "args": [ { "int": "4" } ] },
+              { "prim": "CAR" },
+              { "prim": "CAR" },
+              { "prim": "CAR" },
+              { "prim": "TRANSFER_TOKENS" },
+              { "prim": "CONS" }
+            ]
+          }
+        }
+      ],
+      "pure": true
+    },
+    {
+      "name": "getAllowance",
+      "implementations": [
+        {
+          "michelson-storage-view": {
+            "parameter": {
+               "prim": "pair",
+               "args": [
+                 { "prim": "pair", "args": [ { "prim": "address", "annots": [ "%owner" ] }, { "prim": "address", "annots": [ "%spender" ] } ], "annots": [ "%arg" ] },
+                 { "prim": "address", "annots": [ "%target" ] }
+               ],
+               "annots": [ "%getAllowance" ]
+            },
+            "return-type": {
+              "prim": "nat"
+            },
+            "code": [
+              { "prim": "DIG", "args": [ { "int": "2" } ] },
+              { "prim": "DROP" },
+              { "prim": "DIG", "args": [ { "int": "2" } ] },
+              { "prim": "DROP" },
+              { "prim": "DUP" },
+              { "prim": "CDR" },
+              { "prim": "CONTRACT", "args": [ { "prim": "nat" } ] },
+              { "prim": "NIL", "args": [ { "prim": "operation" } ] },
+              { "prim": "SWAP" },
+              { "prim": "IF_NONE", "args": [ [ { "prim": "PUSH", "args": [ { "prim": "int" }, { "int": "209" } ] }, { "prim": "FAILWITH" } ], [] ] },
+              { "prim": "PUSH", "args": [ { "prim": "mutez" }, { "int": "0" } ] },
+              { "prim": "DIG", "args": [ { "int": "4" } ] },
+              { "prim": "DUP" },
+              { "prim": "DUG", "args": [ { "int": "5" } ] },
+              { "prim": "CAR" },
+              { "prim": "CAR" },
+              { "prim": "CDR" },
+              { "prim": "DIG", "args": [ { "int": "4" } ] },
+              { "prim": "DUP" },
+              { "prim": "DUG", "args": [ { "int": "5" } ] },
+              { "prim": "CAR" },
+              { "prim": "CAR" },
+              { "prim": "GET" },
+              { "prim": "IF_NONE", "args": [ [ { "prim": "PUSH", "args": [ { "prim": "int" }, { "int": "208" } ] }, { "prim": "FAILWITH" } ], [] ] },
+              { "prim": "CAR" },
+              { "prim": "DIG", "args": [ { "int": "4" } ] },
+              { "prim": "CAR" },
+              { "prim": "CDR" },
+              { "prim": "GET" },
+              { "prim": "IF_NONE", "args": [ [ { "prim": "PUSH", "args": [ { "prim": "int" }, { "int": "208" } ] }, { "prim": "FAILWITH" } ], [] ] },
+              { "prim": "TRANSFER_TOKENS" },
+              { "prim": "CONS" }
+            ]
+          }
+        }
+      ],
+      "pure": true
+    }
+  ]
+}

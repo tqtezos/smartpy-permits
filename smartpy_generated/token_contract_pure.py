@@ -1,13 +1,16 @@
 import smartpy as sp
 import smartpy_michelson as mi
-
+import json
 
 class FA12(sp.Contract):
     def __init__(self, admin):
-        self.init(paused=False, balances=sp.big_map(tvalue=sp.TRecord(approvals=sp.TMap(sp.TAddress, sp.TNat), balance=sp.TNat)), administrator=admin, totalSupply=0,
-                  permits=sp.big_map(tkey=sp.TPair(sp.TAddress, sp.TBytes), tvalue=sp.TTimestamp), user_expiries=sp.big_map(tkey=sp.TAddress, tvalue=sp.TOption(sp.TNat)),
-                  permit_expiries=sp.big_map(tkey=sp.TPair(sp.TAddress, sp.TBytes), tvalue=sp.TOption(sp.TNat)), counter=0,
-                  default_expiry=360, metadata=sp.big_map(l={"": sp.bytes_of_string("tezos-storage:md-json"), "md-json": sp.bytes_of_string("{}")}))
+        with open('metadata/metadata.json', 'r') as f:
+          #loads then dumps to confirm correctly formatted json
+          metadata = json.dumps(json.load(f))
+          self.init(paused=False, balances=sp.big_map(tvalue=sp.TRecord(approvals=sp.TMap(sp.TAddress, sp.TNat), balance=sp.TNat)), administrator=admin, totalSupply=0,
+                    permits=sp.big_map(tkey=sp.TPair(sp.TAddress, sp.TBytes), tvalue=sp.TTimestamp), user_expiries=sp.big_map(tkey=sp.TAddress, tvalue=sp.TOption(sp.TNat)),
+                    permit_expiries=sp.big_map(tkey=sp.TPair(sp.TAddress, sp.TBytes), tvalue=sp.TOption(sp.TNat)), counter=0,
+                    default_expiry = 360, max_expiry = 2628000, metadata=sp.big_map(l={"": sp.bytes_of_string("tezos-storage:md-json"), "md-json": sp.bytes_of_string(metadata)}))
 
     @sp.entry_point
     def transfer(self, params):
@@ -123,6 +126,7 @@ class FA12(sp.Contract):
         sp.set_type(params, sp.TRecord(address=sp.TAddress, seconds=sp.TNat, permit=sp.TOption(
             sp.TBytes))).layout(("address", ("seconds", "permit")))
         sp.verify(~self.data.paused)
+        sp.verify(params.seconds <= self.data.max_expiry, "MAX_SECONDS_EXCEEDED")
         sp.verify_equal(params.address, sp.sender, message="NOT_AUTHORIZED")
         with sp.if_(params.permit.is_some()):
             some_permit = params.permit.open_some()
