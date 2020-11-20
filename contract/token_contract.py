@@ -10,7 +10,7 @@ class FA12(sp.Contract):
           self.init(paused=False, balances=sp.big_map(tvalue=sp.TRecord(approvals=sp.TMap(sp.TAddress, sp.TNat), balance=sp.TNat)), administrator=admin, totalSupply=0,
                     permits=sp.big_map(tkey=sp.TPair(sp.TAddress, sp.TBytes), tvalue=sp.TTimestamp), user_expiries=sp.big_map(tkey=sp.TAddress, tvalue=sp.TOption(sp.TNat)),
                     permit_expiries=sp.big_map(tkey=sp.TPair(sp.TAddress, sp.TBytes), tvalue=sp.TOption(sp.TNat)), counter=0,
-                    default_expiry = 360, max_expiry = 2628000, metadata=sp.big_map(l={"": sp.bytes_of_string("tezos-storage:md-json"), "md-json": sp.bytes_of_string(metadata)}))
+                    default_expiry = 50000, max_expiry = 2628000, metadata=sp.big_map(l={"": sp.bytes_of_string("tezos-storage:md-json"), "md-json": sp.bytes_of_string(metadata)}))
 
     @sp.entry_point
     def transfer(self, params):
@@ -416,4 +416,4 @@ if "templates" not in __name__:
         view_defaultExpiry = Viewer(sp.TNat)
         scenario += view_defaultExpiry
         scenario += c1.getDefaultExpiry(target=view_defaultExpiry.address)
-        scenario.verify_equal(view_defaultExpiry.data.last, sp.some(360))
+        scenario.verify_equal(view_defaultExpiry.data.last, sp.some(50000))
