@@ -1,3 +1,20 @@
+Read about TZIP here https://gitlab.com/tzip/tzip/-/blob/master/proposals/tzip-17/tzip-17.md
+
+## Setting Up
+### Requirements
+#### Tezos-client and Sandboxed mode
+To set up the tezos-client and sandboxed mode follow the instructions in https://tezos.gitlab.io/
+
+#### Get Smartpy
+https://smartpy.io/cli/
+
+### (Optionally) Edit and ReCompile and Smartpy code
+```
+$ ./test_permit.sh
+```
+
+## Use
+
 ### Initialize bootstrap addresses
 ```
 $ bootstrap1_address="tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
