@@ -8,7 +8,7 @@ To set up the tezos-client and sandboxed mode follow the instructions in https:/
 #### Get Smartpy
 https://smartpy.io/cli/
 
-### (Optionally) Edit and ReCompile and Smartpy code
+#### (Optionally) Edit and ReCompile and Smartpy code
 ```
 $ ./test_permit.sh
 ```
