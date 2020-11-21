@@ -1,5 +1,7 @@
 Read about TZIP here https://gitlab.com/tzip/tzip/-/blob/master/proposals/tzip-17/tzip-17.md
 
+This is an implementation of Permits on top of a generic smartpy fa1.2 contract: https://smartpy.io/ide?template=FA1.2.py&source=post_page---------------------------
+
 ## Setting Up
 ### Requirements
 #### Tezos-client and Sandboxed mode
@@ -2222,3 +2224,17 @@ Use command
   tezos-client wait for onxpDWvgwrSGiGYq4WAYne25MHtJeCv9NXf3p3T5z9BfsP5c9WG to be included --confirmations 30 --branch BMR7g84ZngYqMjKjD56hRGbzMW47ePKAcEVBPXuFeoUv7fRdnxn
 and/or an external block explorer.
 ```
+
+# Misc notes/TODO
+
+1. Not including all possible views in metadata json because it makes storage too large and max operation size gets exceeded.
+2. A lot of code would be cut if I could call one sub_entry_point from another (specifically getEffectiveExpiry)
+3. For some reason order of last two parameters in setExpiry entrypoint are switched around when I call in sandbox, not sure why.
+4. Question about TZIP-17 in general: Is it acceptable that permit can go from expired to unexpired? Namely, if a permit was expired due to user expiry being too low and then we increase user_expiry, functionally the permit's life gets extended? 
+
+# Design choices
+
+1. Batch delete permit entrypoint and permits/expiry info deleted when encountered as expired.
+2. max_expiry is a storage variable to avoid contract locking (see tzip.md doc).
+
+
