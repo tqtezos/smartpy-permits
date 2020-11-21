@@ -71,7 +71,6 @@ class FA12(sp.Contract):
                     effective_expiry.value = self.data.user_expiries[params.from_].open_some()
                 with sp.else_():
                     effective_expiry.value = self.data.default_expiry
-            #effective_expiry = self.getEffectiveExpiry(sp.pair(params.from_, params_hash))
             # Deleting permit regardless of whether or not its expired
             with sp.if_(sp.as_nat(sp.now - permit_submission_timestamp) >= effective_expiry.value):
                 # Expired
@@ -88,7 +87,6 @@ class FA12(sp.Contract):
         sp.set_type(params, sp.TList(
             sp.TPair(sp.TKey, sp.TPair(sp.TSignature, sp.TBytes))))
         sp.verify(~self.data.paused)
-        # Local variable initialization (values here don't matter)
         with sp.for_('permit', params) as permit:
             params_hash = sp.snd(sp.snd(permit))
             unsigned = sp.pack(sp.pair(sp.pair(sp.chain_id, sp.self_address), sp.pair(
@@ -150,8 +148,6 @@ class FA12(sp.Contract):
                               < self.data.default_expiry, "PERMIT_REVOKED")
             self.data.permit_expiries[sp.pair(
                 params.address, some_permit)] = sp.some(params.seconds)
-        # Caution/Question about tzip-17: there might be a situation in which permit once was revoked now is alive, if we change user-expiry and that was considered the effective_expiry previously, or if default_expiry was effective and it was less than new value for user expiry.
-        with sp.else_():
             self.data.user_expiries[params.address] = sp.some(params.seconds)
 
     @sp.entry_point
