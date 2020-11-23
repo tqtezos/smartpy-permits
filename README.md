@@ -2085,7 +2085,7 @@ Fatal error:
 $ MISSIGNED=0x05070707070a000000047a06a7700a00000016015d22ffe866052e73c7dc6e964601fdbc5913572c00070700010a00000020e6f1aa42d877954d34bbde9ca5bdd2676b139adb52ebc7b943fe8a07f55591e9
 ```
 
-### Sign MISSIGNED bytes and submit new permit 
+### Sign MISSIGNED bytes and submit new permit
 1. Sign MISSIGNED
 
 ```
@@ -2229,12 +2229,9 @@ and/or an external block explorer.
 
 1. Not including all possible views in metadata json because it makes storage too large and max operation size gets exceeded.
 2. A lot of code would be cut if I could call one sub_entry_point from another (specifically getEffectiveExpiry)
-3. For some reason order of last two parameters in setExpiry entrypoint are switched around when I call in sandbox, not sure why.
-4. Question about TZIP-17 in general: Is it acceptable that permit can go from expired to unexpired? Namely, if a permit was expired due to user expiry being too low and then we increase user_expiry, functionally the permit's life gets extended? 
+3. Question about TZIP-17 in general: Is it acceptable that permit can go from expired to unexpired? Namely, if a permit was expired due to user expiry being too low and then we increase user_expiry, functionally the permit's life gets extended? 
 
 # Design choices
 
 1. Batch delete permit entrypoint and permits/expiry info deleted when encountered as expired.
 2. max_expiry is a storage variable to avoid contract locking (see tzip.md doc).
-
-
