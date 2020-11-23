@@ -1,6 +1,10 @@
+# Implementation of Permits in Smartpy on top of FA1.2
+
 Read about TZIP here https://gitlab.com/tzip/tzip/-/blob/master/proposals/tzip-17/tzip-17.md
 
-This is an implementation of Permits on top of a generic smartpy fa1.2 contract: https://smartpy.io/ide?template=FA1.2.py&source=post_page---------------------------
+This is an implementation of Permits on top of a generic smartpy fa1.2 contract: https://smartpy.io/ide?template=FA1.2.py&source=post_page-----------------------
+
+See contract deployed on Carthagenet: https://better-call.dev/carthagenet/KT1Fm7LZKVzU6gs3ZtFTdtQUaDHJxgY79i8F/operations
 
 ## Setting Up
 ### Requirements
@@ -2227,9 +2231,9 @@ and/or an external block explorer.
 
 # Misc notes/TODO
 
-1. Not including all possible views in metadata json because it makes storage too large and max operation size gets exceeded.
+1. Not including all possible views in metadata json because it makes storage too large and max operation size gets exceeded. As a work around, update-metadata entrypoint should be added to add new views.
 2. A lot of code would be cut if I could call one sub_entry_point from another (specifically getEffectiveExpiry)
-3. Question about TZIP-17 in general: Is it acceptable that permit can go from expired to unexpired? Namely, if a permit was expired due to user expiry being too low and then we increase user_expiry, functionally the permit's life gets extended? 
+3. Question about TZIP-17 in general: Is it acceptable that permit can go from expired to unexpired? Namely, if a permit was expired due to user expiry being too low and then we increase user_expiry, functionally the permit's life gets extended?
 
 # Design choices
 
