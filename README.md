@@ -4,7 +4,7 @@ Read about TZIP here https://gitlab.com/tzip/tzip/-/blob/master/proposals/tzip-1
 
 This is an implementation of Permits on top of a generic smartpy fa1.2 contract: https://smartpy.io/ide?template=FA1.2.py&source=post_page-----------------------
 
-See contract deployed on Carthagenet: https://better-call.dev/carthagenet/KT1Fm7LZKVzU6gs3ZtFTdtQUaDHJxgY79i8F/operations
+See contract deployed on Carthagenet: https://better-call.dev/carthagenet/KT18wWLphMBbKYUXcPCERXTwN5momzNZW2Gd/operations
 
 
 ## Setting Up
