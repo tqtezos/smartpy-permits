@@ -6,6 +6,7 @@ This is an implementation of Permits on top of a generic smartpy fa1.2 contract:
 
 See contract deployed on Carthagenet: https://better-call.dev/carthagenet/KT1Fm7LZKVzU6gs3ZtFTdtQUaDHJxgY79i8F/operations
 
+
 ## Setting Up
 ### Requirements
 #### Tezos-client and Sandboxed mode
@@ -2012,7 +2013,7 @@ Fatal error:
 TRANSFER_PARAM_HASHED=0x877b50b43b81b9d2c5a6c56087fab148a6622741cd0e79557e6b6131b8b5e49b
 ```
 
-2. Set a random signature
+2. Set a random signature (Just reuse this one)
 ```
 RAND_SIG="edsigtfkWys7vyeQy1PnHcBuac1dgj2aJ8Jv3fvoDE5XRtxTMRgJBwVgMTzvhAzBQyjH48ux9KE8jRZBSk4Rv2bfphsfpKP3ggM"
 ```
