@@ -12,12 +12,12 @@ See contract deployed on Delphinet: https://better-call.dev/delphinet/KT1Tj5SHF3
 #### Tezos-client and Sandboxed mode
 To set up the tezos-client and sandboxed mode follow the instructions in https://tezos.gitlab.io/
 
-#### Get Smartpy
+#### Get latest Smartpy
 https://smartpy.io/cli/
 
-#### (Optionally) Edit and ReCompile and Smartpy code
+#### Add desired administrator to permit.sh and recompile Smartpy code
 ```
-$ ./test_permit.sh
+$ ./permit.sh
 ```
 
 ## Use
@@ -53,10 +53,6 @@ Gas remaining: 1039764 units remaining
 $TRANSFER_PARAM_PACKED=0x0507070a000000160000e7670f32038107a59a2b9cfefae36ea21f5aa63c07070a000000160000dac9f52543da1aed0bc1d6b46bf7c10db7014cd60005
 
 ```
-### Change administrator to bootstrap1 in smartpy_generated/token_contract_storage_init.tz
-
-Add bootstrap1's address to administrator address parameter in smartpy_generated/token_contract_storage_init.tz
-
 
 ### Originate permit-fa1.2 contract
 
@@ -2233,10 +2229,10 @@ and/or an external block explorer.
 # Misc notes/TODO
 
 1. Not including all possible views in metadata json because it makes storage too large and max operation size gets exceeded. As a work around, update-metadata entrypoint should be added to add new views.
-2. A lot of code would be cut if I could call one sub_entry_point from another (specifically getEffectiveExpiry)
+2. Could simplify transfer_presigned if I could call one sub_entry_point from another (specifically getEffectiveExpiry)
 3. Question about TZIP-17 in general: Is it acceptable that permit can go from expired to unexpired? Namely, if a permit was expired due to user expiry being too low and then we increase user_expiry, functionally the permit's life gets extended?
 
 # Design choices
 
-1. Batch delete permit entrypoint and permits/expiry info deleted when encountered as expired.
+1. Batch delete permit entrypoint and permits/expiry info deleted (or set to none) when encountered as expired.
 2. max_expiry is a storage variable to avoid contract locking (see tzip.md doc).
