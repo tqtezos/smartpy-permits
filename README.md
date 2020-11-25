@@ -15,7 +15,7 @@ To set up the tezos-client and sandboxed mode follow the instructions in https:/
 #### Get latest Smartpy
 https://smartpy.io/cli/
 
-#### Add desired administrator to permit.sh and recompile Smartpy code
+#### Add desired administrator (I use bootstrap1) to permit.sh and recompile Smartpy code
 ```
 $ ./permit.sh
 ```
