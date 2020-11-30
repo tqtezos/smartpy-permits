@@ -1,8 +1,21 @@
 import smartpy as sp
 import json
 
+class Error_message:
+    def permit_missigned(self):        return "MISSIGNED"
+    def duplicate_permit(self):        return "DUP_PERMIT"
+    def expiry_exceeds_max(self):      return "MAX_SECONDS_EXCEEDED"
+    def user_unauthorized(self):       return "USER_UNAUTHORIZED"
+    def permit_nonexistent(self):      return "PERMIT_NONEXISTENT"
+    def permit_revoked(self):          return "PERMIT_REVOKED"
+    def unsafe_allowance_change(self): return "UNSAFE_ALLOWANCE_CHANGE"
+    def balance_insufficient(self): return "BALANCE_INSUFFICIENT"
+
+
+
 class FA12(sp.Contract):
     def __init__(self, admin):
+        self.error_message=Error_message()
         with open('metadata/metadata.json', 'r') as f:
           #loads then dumps to confirm correctly formatted json
           metadata = json.dumps(json.load(f))
@@ -22,9 +35,9 @@ class FA12(sp.Contract):
         sp.verify((sender.value == self.data.administrator) |
                   (~self.data.paused &
                    ((params.from_ == sender.value) |
-                    (self.data.balances[params.from_].approvals[sender.value] >= params.value))))
+                    (self.data.balances[params.from_].approvals[sender.value] >= params.value))), self.error_message.user_unauthorized())
         self.addAddressIfNecessary(params.to_)
-        sp.verify(self.data.balances[params.from_].balance >= params.value)
+        sp.verify(self.data.balances[params.from_].balance >= params.value, self.error_message.balance_insufficient())
         self.data.balances[params.from_].balance = sp.as_nat(
             self.data.balances[params.from_].balance - params.value)
         self.data.balances[params.to_].balance += params.value
@@ -98,8 +111,8 @@ class FA12(sp.Contract):
             effective_expiry = self.getEffectiveExpiry(permit_key)
             permit_submission_timestamp = self.data.permit_data.permits[permit_key]
             sp.verify(~ (permit_exists & (sp.as_nat(sp.now - permit_submission_timestamp) < effective_expiry)),
-                      sp.pair("DUP_PERMIT", params_hash))
-            sp.verify(sp.check_signature(public_key, signature, unsigned), sp.pair("MISSIGNED", unsigned))
+                      sp.pair(self.error_message.duplicate_permit(), params_hash))
+            sp.verify(sp.check_signature(public_key, signature, unsigned), sp.pair(self.error_message.permit_missigned(), unsigned))
             self.data.permit_data.permits[permit_key] = sp.now
             self.data.permit_data.counter = self.data.permit_data.counter + 1
 
@@ -111,17 +124,17 @@ class FA12(sp.Contract):
         address = sp.fst(params)
         new_expiry = sp.fst(sp.snd(params))
         possible_bytes = sp.snd(sp.snd(params))
-        sp.verify(new_expiry <= self.data.permit_data.max_expiry, "MAX_SECONDS_EXCEEDED")
-        sp.verify_equal(address, sp.sender, message="NOT_AUTHORIZED")
+        sp.verify(new_expiry <= self.data.permit_data.max_expiry, self.error_message.expiry_exceeds_max())
+        sp.verify_equal(address, sp.sender, message=self.error_message.user_unauthorized())
         with sp.if_(possible_bytes.is_some()):
             some_permit = possible_bytes.open_some()
             permit_key = sp.pair(address, some_permit)
             sp.verify(self.data.permit_data.permits.contains(
-                permit_key), "PERMIT_NONEXISTENT")
+                permit_key), self.error_message.permit_nonexistent())
             permit_submission_timestamp = self.data.permit_data.permits[permit_key]
             effective_expiry = self.getEffectiveExpiry(permit_key)
             sp.verify(sp.as_nat(sp.now - permit_submission_timestamp)
-                      < effective_expiry, "PERMIT_REVOKED")
+                      < effective_expiry, self.error_message.permit_revoked())
             self.data.permit_data.permit_expiries[permit_key] = sp.some(new_expiry)
         with sp.else_():
             self.data.permit_data.user_expiries[address] = sp.some(new_expiry)
@@ -134,25 +147,25 @@ class FA12(sp.Contract):
         alreadyApproved = self.data.balances[sp.sender].approvals.get(
             params.spender, 0)
         sp.verify((alreadyApproved == 0) | (
-            params.value == 0), "UnsafeAllowanceChange")
+            params.value == 0), self.error_message.unsafe_allowance_change())
         self.data.balances[sp.sender].approvals[params.spender] = params.value
 
     @sp.entry_point
     def setPause(self, params):
         sp.set_type(params, sp.TBool)
-        sp.verify(sp.sender == self.data.administrator)
+        sp.verify(sp.sender == self.data.administrator, self.error_message.user_unauthorized())
         self.data.paused = params
 
     @sp.entry_point
     def setAdministrator(self, params):
         sp.set_type(params, sp.TAddress)
-        sp.verify(sp.sender == self.data.administrator)
+        sp.verify(sp.sender == self.data.administrator, self.error_message.user_unauthorized())
         self.data.administrator = params
 
     @sp.entry_point
     def mint(self, params):
         sp.set_type(params, sp.TRecord(address=sp.TAddress, value=sp.TNat))
-        sp.verify(sp.sender == self.data.administrator)
+        sp.verify(sp.sender == self.data.administrator, self.error_message.user_unauthorized())
         self.addAddressIfNecessary(params.address)
         self.data.balances[params.address].balance += params.value
         self.data.totalSupply += params.value
@@ -160,8 +173,8 @@ class FA12(sp.Contract):
     @sp.entry_point
     def burn(self, params):
         sp.set_type(params, sp.TRecord(address=sp.TAddress, value=sp.TNat))
-        sp.verify(sp.sender == self.data.administrator)
-        sp.verify(self.data.balances[params.address].balance >= params.value)
+        sp.verify(sp.sender == self.data.administrator, self.error_message.user_unauthorized())
+        sp.verify(self.data.balances[params.address].balance >= params.value, self.error_message.balance_insufficient())
         self.data.balances[params.address].balance = sp.as_nat(
             self.data.balances[params.address].balance - params.value)
         self.data.totalSupply = sp.as_nat(self.data.totalSupply - params.value)
