@@ -1,6 +1,8 @@
 import smartpy as sp
 import json
 
+FA12 = sp.import_script_from_url("file:./contract/FA1.2.py")
+
 def inline(f, *args, **kwargs):
   res = sp.seq()
   with res:
@@ -17,18 +19,21 @@ class Error_message:
     def unsafe_allowance_change(self): return "UNSAFE_ALLOWANCE_CHANGE"
     def balance_insufficient(self): return "BALANCE_INSUFFICIENT"
 
-
-
-class FA12(sp.Contract):
+class Permit(FA12.FA12):
     def __init__(self, admin):
         self.error_message=Error_message()
         with open('metadata/metadata.json', 'r') as f:
           #loads then dumps to confirm correctly formatted json
           metadata = json.dumps(json.load(f))
-          self.init(paused=False, balances=sp.big_map(tvalue=sp.TRecord(approvals=sp.TMap(sp.TAddress, sp.TNat), balance=sp.TNat)), administrator=admin, totalSupply=0,
-                    permit_data=sp.record(permits = sp.map(tkey=sp.TPair(sp.TAddress, sp.TBytes), tvalue=sp.TTimestamp), user_expiries = sp.map(tkey=sp.TAddress, tvalue=sp.TOption(sp.TNat)),
-                    permit_expiries = sp.map(tkey=sp.TPair(sp.TAddress, sp.TBytes), tvalue=sp.TOption(sp.TNat)), counter = 0 , default_expiry = 50000,
-                    max_expiry = 2628000), metadata=sp.big_map(l={"": sp.bytes_of_string("tezos-storage:md-json"), "md-json": sp.bytes_of_string(metadata)}))
+          super().__init__(admin,
+                  permit_data=sp.record(permits = sp.map(tkey=sp.TPair(sp.TAddress, sp.TBytes), tvalue=sp.TTimestamp),
+                  user_expiries = sp.map(tkey=sp.TAddress, tvalue=sp.TOption(sp.TNat)),
+                  permit_expiries = sp.map(tkey=sp.TPair(sp.TAddress, sp.TBytes), tvalue=sp.TOption(sp.TNat)),
+                  counter = 0 ,
+                  default_expiry = 50000,
+                  max_expiry = 2628000),
+                  metadata=sp.big_map(l={"": sp.bytes_of_string("tezos-storage:md-json"), "md-json": sp.bytes_of_string(metadata)}))
+
 
     @sp.entry_point
     def transfer(self, params):
@@ -138,97 +143,27 @@ class FA12(sp.Contract):
         with sp.else_():
             self.data.permit_data.user_expiries[address] = sp.some(new_expiry)
 
-    @sp.entry_point
-    def approve(self, params):
-        sp.set_type(params, sp.TRecord(spender=sp.TAddress,
-                                       value=sp.TNat).layout(("spender", "value")))
-        sp.verify(~self.data.paused)
-        alreadyApproved = self.data.balances[sp.sender].approvals.get(
-            params.spender, 0)
-        sp.verify((alreadyApproved == 0) | (
-            params.value == 0), self.error_message.unsafe_allowance_change())
-        self.data.balances[sp.sender].approvals[params.spender] = params.value
-
-    @sp.entry_point
-    def setPause(self, params):
-        sp.set_type(params, sp.TBool)
-        sp.verify(sp.sender == self.data.administrator, self.error_message.user_unauthorized())
-        self.data.paused = params
-
-    @sp.entry_point
-    def setAdministrator(self, params):
-        sp.set_type(params, sp.TAddress)
-        sp.verify(sp.sender == self.data.administrator, self.error_message.user_unauthorized())
-        self.data.administrator = params
-
-    @sp.entry_point
-    def mint(self, params):
-        sp.set_type(params, sp.TRecord(address=sp.TAddress, value=sp.TNat))
-        sp.verify(sp.sender == self.data.administrator, self.error_message.user_unauthorized())
-        self.addAddressIfNecessary(params.address)
-        self.data.balances[params.address].balance += params.value
-        self.data.totalSupply += params.value
-
-    @sp.entry_point
-    def burn(self, params):
-        sp.set_type(params, sp.TRecord(address=sp.TAddress, value=sp.TNat))
-        sp.verify(sp.sender == self.data.administrator, self.error_message.user_unauthorized())
-        sp.verify(self.data.balances[params.address].balance >= params.value, self.error_message.balance_insufficient())
-        self.data.balances[params.address].balance = sp.as_nat(
-            self.data.balances[params.address].balance - params.value)
-        self.data.totalSupply = sp.as_nat(self.data.totalSupply - params.value)
-
-    def addAddressIfNecessary(self, address):
-        with sp.if_(~ self.data.balances.contains(address)):
-            self.data.balances[address] = sp.record(balance=0, approvals={})
-
-    @sp.entry_point
-    def getBalance(self, params):
-        sp.transfer(self.data.balances[params.arg.owner].balance, sp.tez(
-            0), sp.contract(sp.TNat, params.target).open_some())
-
-    @sp.entry_point
-    def getAllowance(self, params):
-        sp.transfer(self.data.balances[params.arg.owner].approvals[params.arg.spender], sp.tez(
-            0), sp.contract(sp.TNat, params.target).open_some())
-
-    @sp.entry_point
-    def getTotalSupply(self, params):
-        sp.transfer(self.data.totalSupply, sp.tez(
-            0), sp.contract(sp.TNat, params.target).open_some())
-
-    @sp.entry_point
-    def getAdministrator(self, params):
-        sp.transfer(self.data.administrator, sp.tez(
-            0), sp.contract(sp.TAddress, params.target).open_some())
-
-    @sp.entry_point
+    @sp.view(sp.TNat)
     def getCounter(self, params):
-        sp.transfer(self.data.permit_data.counter, sp.tez(0), sp.contract(
-            sp.TNat, params.target).open_some())
+        sp.set_type(params, sp.TUnit)
+        sp.result(self.data.permit_data.counter)
 
-    @sp.entry_point
+    @sp.view(sp.TNat)
     def getDefaultExpiry(self, params):
-        sp.transfer(self.data.permit_data.default_expiry, sp.tez(
-            0), sp.contract(sp.TNat, params.target).open_some())
+        sp.set_type(params, sp.TUnit)
+        sp.result(self.data.permit_data.default_expiry)
 
-
-class Viewer(sp.Contract):
-    def __init__(self, t):
-        self.init(last=sp.none)
-        self.init_type(sp.TRecord(last=sp.TOption(t)))
-
-    @sp.entry_point
-    def target(self, params):
-        self.data.last = sp.some(params)
-
+    @sp.view(sp.TNat)
+    def getMaxExpiry(self, params):
+        sp.set_type(params, sp.TUnit)
+        sp.result(self.data.permit_data.max_expiry)
 
 if "templates" not in __name__:
-    @sp.add_test(name="FA12")
+    @sp.add_test(name="Permit")
     def test():
 
         scenario = sp.test_scenario()
-        scenario.h1("FA1.2 template - Fungible assets")
+        scenario.h1("FA1.2 template - Fungible assets + Tzip-17 permits")
 
         scenario.table_of_contents()
 
@@ -243,54 +178,13 @@ if "templates" not in __name__:
         scenario.show([admin, alice, bob, carlos])
 
         scenario.h1("Contract")
-        c1 = FA12(admin.address)
+        c1 = Permit(admin.address)
 
         scenario.h1("Entry points")
         scenario += c1
         scenario.h2("Admin mints a few coins")
-        scenario += c1.mint(address=alice.address, value=12).run(sender=admin)
-        scenario += c1.mint(address=alice.address, value=3).run(sender=admin)
-        scenario += c1.mint(address=alice.address, value=3).run(sender=admin)
-        scenario.verify(c1.data.balances[alice.address].balance == 18)
-        scenario.h2("Alice transfers to Bob")
-        scenario += c1.transfer(from_=alice.address,
-                                to_=bob.address, value=4).run(sender=alice)
-        scenario.verify(c1.data.balances[alice.address].balance == 14)
-        scenario.h2(
-            "Bob tries to transfer from Alice but he doesn't have her approval")
-        scenario += c1.transfer(from_=alice.address, to_=bob.address,
-                                value=4).run(sender=bob, valid=False)
-        scenario.h2("Alice approves Bob and Bob transfers")
-        scenario += c1.approve(spender=bob.address, value=5).run(sender=alice)
-        scenario += c1.transfer(from_=alice.address,
-                                to_=bob.address, value=4).run(sender=bob)
-        scenario.h2("Bob tries to over-transfer from Alice")
-        scenario += c1.transfer(from_=alice.address, to_=bob.address,
-                                value=4).run(sender=bob, valid=False)
-        scenario.h2("Admin burns Bob token")
-        scenario += c1.burn(address=bob.address, value=1).run(sender=admin)
-        scenario.verify(c1.data.balances[alice.address].balance == 10)
-        scenario.h2("Alice tries to burn Bob token")
-        scenario += c1.burn(address=bob.address,
-                            value=1).run(sender=alice, valid=False)
-        scenario.h2(
-            "Admin pauses the contract and Alice cannot transfer anymore")
-        scenario += c1.setPause(True).run(sender=admin)
-        scenario += c1.transfer(from_=alice.address, to_=bob.address,
-                                value=4).run(sender=alice, valid=False)
-        scenario.verify(c1.data.balances[alice.address].balance == 10)
-        scenario.h2("Admin transfers while on pause")
-        scenario += c1.transfer(from_=alice.address,
-                                to_=bob.address, value=1).run(sender=admin)
-        scenario.h2("Admin unpauses the contract and transfers are allowed")
-        scenario += c1.setPause(False).run(sender=admin)
-        scenario.verify(c1.data.balances[alice.address].balance == 9)
-        scenario += c1.transfer(from_=alice.address,
-                                to_=bob.address, value=1).run(sender=alice)
-
-        scenario.verify(c1.data.totalSupply == 17)
-        scenario.verify(c1.data.balances[alice.address].balance == 8)
-        scenario.verify(c1.data.balances[bob.address].balance == 9)
+        scenario += c1.mint(address=alice.address, value=8).run(sender=admin)
+        scenario += c1.mint(address=bob.address, value=9).run(sender=admin)
 
         scenario.h2("Permit Submissions")
         scenario += c1.mint(address=carlos.address, value=10).run(sender=admin)
@@ -356,42 +250,21 @@ if "templates" not in __name__:
             sender=bob, now=sp.timestamp(1571761680), valid=False)  # Uses later time stamp
 
         scenario.h1("Views")
-        scenario.h2("Balance")
-        view_balance = Viewer(sp.TNat)
-        scenario += view_balance
-        scenario += c1.getBalance(arg=sp.record(owner=alice.address),
-                                  target=view_balance.address)
-        scenario.verify_equal(view_balance.data.last, sp.some(8))
-
-        scenario.h2("Administrator")
-        view_administrator = Viewer(sp.TAddress)
-        scenario += view_administrator
-        scenario += c1.getAdministrator(target=view_administrator.address)
-        scenario.verify_equal(view_administrator.data.last,
-                              sp.some(admin.address))
-
-        scenario.h2("Total Supply")
-        view_totalSupply = Viewer(sp.TNat)
-        scenario += view_totalSupply
-        scenario += c1.getTotalSupply(target=view_totalSupply.address)
-        scenario.verify_equal(view_totalSupply.data.last, sp.some(27))
-
-        scenario.h2("Allowance")
-        view_allowance = Viewer(sp.TNat)
-        scenario += view_allowance
-        scenario += c1.getAllowance(arg=sp.record(owner=alice.address,
-                                                  spender=bob.address), target=view_allowance.address)
-        scenario.verify_equal(view_allowance.data.last, sp.some(1))
-
         scenario.h2("Counter")
-        view_counter = Viewer(sp.TNat)
+        view_counter = FA12.Viewer(sp.TNat)
         scenario += view_counter
-        scenario += c1.getCounter(target=view_counter.address)
+        scenario += c1.getCounter(sp.pair(sp.unit, view_counter.typed))
         scenario.verify_equal(view_counter.data.last, sp.some(3))
 
         scenario.h2("Default Expiry")
-        view_defaultExpiry = Viewer(sp.TNat)
+        view_defaultExpiry = FA12.Viewer(sp.TNat)
         scenario += view_defaultExpiry
-        scenario += c1.getDefaultExpiry(target=view_defaultExpiry.address)
+        scenario += c1.getDefaultExpiry(sp.pair(sp.unit, view_defaultExpiry.typed))
         scenario.verify_equal(view_defaultExpiry.data.last, sp.some(50000))
+
+        scenario.h2("Max Expiry")
+        view_maxExpiry = FA12.Viewer(sp.TNat)
+        scenario += view_maxExpiry
+        scenario += c1.getMaxExpiry(sp.pair(sp.unit, view_maxExpiry.typed))
+        scenario.verify_equal(view_maxExpiry.data.last, sp.some(2628000))
 
