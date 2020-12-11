@@ -12,8 +12,8 @@ See contract deployed on Delphinet: https://better-call.dev/delphinet/KT1Tj5SHF3
 #### Tezos-client and Sandboxed mode
 To set up the tezos-client and sandboxed mode follow the instructions in https://tezos.gitlab.io/
 
-#### Get latest Smartpy
-https://smartpy.io/cli/
+#### I am using an experimental version of Smartpy that allows for inlining of functions that use sp.result()
+https://smartpy.io/releases/20201211-53b0596634e6f33793b8a6e03cbbf954446bf947
 
 #### Add desired administrator to permit.sh and recompile Smartpy code
 ```
