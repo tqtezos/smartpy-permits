@@ -15,7 +15,7 @@ To set up the tezos-client and sandboxed mode follow the instructions in https:/
 #### I am using an experimental version of Smartpy that allows for inlining of functions that use sp.result()
 https://smartpy.io/releases/20201211-53b0596634e6f33793b8a6e03cbbf954446bf947
 
-#### Add desired administrator to permit.sh and recompile Smartpy code
+#### Add desired administrator (I use bootstrap1) to permit.sh and recompile Smartpy code
 ```
 $ ./permit.sh
 ```
