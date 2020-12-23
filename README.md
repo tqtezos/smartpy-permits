@@ -57,7 +57,7 @@ $TRANSFER_PARAM_PACKED=0x0507070a000000160000e7670f32038107a59a2b9cfefae36ea21f5
 ### Originate permit-fa1.2 contract
 
 ```
-$ tezos-client originate contract fa1.2-permits transferring 0 from bootstrap1 running "./smartpy_generated/token_contract_compiled.tz" --burn-cap 500000 --init "$(< smartpy_generated/token_contract_storage_init.tz)"
+$ tezos-client originate contract fa1.2-permits transferring 0 from bootstrap1 running "./smartpy_generated/FA1.2_Permit_compiled.tz" --burn-cap 500000 --init "$(< smartpy_generated/FA1.2_Permit_storage_init.tz)"
 Warning:
 
    The node you are connecting to claims to be running in a
