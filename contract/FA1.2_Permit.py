@@ -5,10 +5,21 @@ import smartpy as sp
 import json
 
 def inline(f, *args, **kwargs):
-  res = sp.seq()
-  with res:
-      f(*args, **kwargs)
-  return sp.bind(res)
+    res = sp.seq()
+    with res:
+        f(*args, **kwargs)
+    return sp.bind(res)
+
+def init_permit_data():
+    return sp.record(permits = sp.map(tkey=sp.TPair(sp.TAddress, sp.TBytes), tvalue=sp.TTimestamp),
+    user_expiries = sp.map(tkey=sp.TAddress, tvalue=sp.TOption(sp.TNat)),
+    permit_expiries = sp.map(tkey=sp.TPair(sp.TAddress, sp.TBytes), tvalue=sp.TOption(sp.TNat)),
+    counter = 0,
+    default_expiry = 50000,
+    max_expiry = 2628000)
+
+def init_metadata(md):
+    return sp.big_map(l={"": sp.bytes_of_string("tezos-storage:data"), "data": sp.bytes_of_string(md)})
 
 class Error_message:
     def permit_missigned(self):        return "MISSIGNED"
@@ -71,9 +82,14 @@ class FA12_core(sp.Contract):
     def is_administrator(self, sender):
         return sp.bool(False)
 
-class Permit(FA12_core):
+class Permit(sp.Contract):
     def __init__(self):
         self.error_message=Error_message()
+        with open('metadata/metadata.json', 'r') as f:
+          #loads then dumps to confirm correctly formatted json
+          md = json.dumps(json.load(f))
+          self.init(permit_data = init_permit_data(),
+                  metadata = init_metadata(md))
 
     def getEffectiveExpiry(self, params):
         address = sp.fst(params)
@@ -206,15 +222,9 @@ class FA12_Permit(FA12, Permit):
         self.error_message=Error_message()
         with open('metadata/metadata.json', 'r') as f:
           #loads then dumps to confirm correctly formatted json
-          metadata = json.dumps(json.load(f))
-          FA12.__init__(self, admin,
-                  permit_data=sp.record(permits = sp.map(tkey=sp.TPair(sp.TAddress, sp.TBytes), tvalue=sp.TTimestamp),
-                  user_expiries = sp.map(tkey=sp.TAddress, tvalue=sp.TOption(sp.TNat)),
-                  permit_expiries = sp.map(tkey=sp.TPair(sp.TAddress, sp.TBytes), tvalue=sp.TOption(sp.TNat)),
-                  counter = 0 ,
-                  default_expiry = 50000,
-                  max_expiry = 2628000),
-                  metadata=sp.big_map(l={"": sp.bytes_of_string("tezos-storage:data"), "data": sp.bytes_of_string(metadata)}))
+          md = json.dumps(json.load(f))
+          FA12.__init__(self, admin, permit_data = init_permit_data(),
+                  metadata = init_metadata(md))
 
     #overrides
     @sp.entry_point
