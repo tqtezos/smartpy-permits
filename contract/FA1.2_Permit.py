@@ -4,12 +4,6 @@
 import smartpy as sp
 import json
 
-def inline(f, *args, **kwargs):
-    res = sp.seq()
-    with res:
-        f(*args, **kwargs)
-    return sp.bind(res)
-
 def init_permit_data():
     return sp.record(permits = sp.map(tkey=sp.TPair(sp.TAddress, sp.TBytes), tvalue=sp.TTimestamp),
     user_expiries = sp.map(tkey=sp.TAddress, tvalue=sp.TOption(sp.TNat)),
@@ -92,17 +86,20 @@ class Permit(sp.Contract):
                   metadata = init_metadata(md))
 
     def getEffectiveExpiry(self, params):
-        address = sp.fst(params)
-        sp.if self.data.permit_data.permit_expiries.contains(params) & self.data.permit_data.permit_expiries[params].is_some():
-            permit_expiry = self.data.permit_data.permit_expiries[params].open_some()
-            sp.result(permit_expiry)
-        sp.else:
-            sp.if self.data.permit_data.user_expiries.contains(address) & self.data.permit_data.user_expiries[address].is_some():
-                user_expiry = self.data.permit_data.user_expiries[address].open_some()
-                sp.result(user_expiry)
-            sp.else:
-                default_expiry = self.data.permit_data.default_expiry
-                sp.result(default_expiry)
+        b = sp.bind_block()
+        with b:
+          address = sp.fst(params)
+          sp.if self.data.permit_data.permit_expiries.contains(params) & self.data.permit_data.permit_expiries[params].is_some():
+              permit_expiry = self.data.permit_data.permit_expiries[params].open_some()
+              sp.result(permit_expiry)
+          sp.else:
+              sp.if self.data.permit_data.user_expiries.contains(address) & self.data.permit_data.user_expiries[address].is_some():
+                  user_expiry = self.data.permit_data.user_expiries[address].open_some()
+                  sp.result(user_expiry)
+              sp.else:
+                  default_expiry = self.data.permit_data.default_expiry
+                  sp.result(default_expiry)
+        return b.value
 
     def delete_permit(self, permit_key):
         sp.set_type(permit_key, sp.TPair(sp.TAddress, sp.TBytes))
@@ -127,9 +124,9 @@ class Permit(sp.Contract):
             permit_key = sp.pair(pk_address, params_hash)
             permit_exists = self.data.permit_data.permits.contains(permit_key)
             permit_submission_timestamp = self.data.permit_data.permits[permit_key]
-            with inline(self.getEffectiveExpiry, permit_key) as effective_expiry:
-              sp.verify(~ (permit_exists & (sp.as_nat(sp.now - permit_submission_timestamp) < effective_expiry)),
-                        sp.pair(self.error_message.duplicate_permit(), params_hash))
+            effective_expiry = self.getEffectiveExpiry(permit_key)
+            sp.verify(~ (permit_exists & (sp.as_nat(sp.now - permit_submission_timestamp) < effective_expiry)),
+                sp.pair(self.error_message.duplicate_permit(), params_hash))
             sp.verify(sp.check_signature(public_key, signature, unsigned), sp.pair(self.error_message.permit_missigned(), unsigned))
             self.data.permit_data.permits[permit_key] = sp.now
             self.data.permit_data.counter = self.data.permit_data.counter + 1
@@ -149,9 +146,9 @@ class Permit(sp.Contract):
             sp.verify(self.data.permit_data.permits.contains(
                 permit_key), self.error_message.permit_nonexistent())
             permit_submission_timestamp = self.data.permit_data.permits[permit_key]
-            with inline(self.getEffectiveExpiry, permit_key) as effective_expiry:
-              sp.verify(sp.as_nat(sp.now - permit_submission_timestamp)
-                        < effective_expiry, self.error_message.permit_revoked())
+            effective_expiry = self.getEffectiveExpiry(permit_key)
+            sp.verify(sp.as_nat(sp.now - permit_submission_timestamp)
+                < effective_expiry, self.error_message.permit_revoked())
             self.data.permit_data.permit_expiries[permit_key] = sp.some(new_expiry)
         sp.else:
             self.data.permit_data.user_expiries[address] = sp.some(new_expiry)
@@ -256,15 +253,15 @@ class FA12_Permit(FA12, Permit):
         permit_key = sp.pair(params.from_, params_hash)
         sp.if self.data.permit_data.permits.contains(permit_key):
             permit_submission_timestamp = self.data.permit_data.permits[permit_key]
-            with inline(self.getEffectiveExpiry, permit_key) as effective_expiry:
-              # Deleting permit regardless of whether or not its expired
-              sp.if sp.as_nat(sp.now - permit_submission_timestamp) >= effective_expiry:
-                  # Expired
-                  self.delete_permit(permit_key)
-                  sp.result(sp.bool(False))
-              sp.else:
-                  self.delete_permit(permit_key)
-                  sp.result(sp.bool(True))
+            effective_expiry = self.getEffectiveExpiry(permit_key)
+            # Deleting permit regardless of whether or not its expired
+            sp.if sp.as_nat(sp.now - permit_submission_timestamp) >= effective_expiry:
+                # Expired
+                self.delete_permit(permit_key)
+                sp.result(sp.bool(False))
+            sp.else:
+                self.delete_permit(permit_key)
+                sp.result(sp.bool(True))
         sp.else:
             sp.result(sp.bool(False))
 
